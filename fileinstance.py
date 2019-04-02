@@ -1,4 +1,4 @@
-# Written by Josh Surya
+# Written by Josh Surya. Qfit written by Alex Bruch, adapted by Josh
 
 import glob
 import os
