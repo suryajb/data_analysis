@@ -1,4 +1,4 @@
-# Written by Josh Surya. Qfit written by Alex Bruch, adapted by Josh
+# Written by Josh Surya. Qfit function written by Alexander Bruch, adapted by Josh
 
 import glob
 import os
