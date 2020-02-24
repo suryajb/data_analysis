@@ -1,4 +1,4 @@
-# Written by Josh Surya. Qfit function written by Alexander Bruch, adapted by Josh
+# Written by Josh Surya
 
 import glob
 import os
@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 from scipy.signal import find_peaks
 from scipy.optimize import curve_fit
 from matplotlib.pyplot import cm
+import pdb
 from matplotlib.ticker import ScalarFormatter
 import matplotlib.ticker as ticker
 
@@ -29,15 +30,20 @@ class file_obj:
             self.shg_suffix = shg_suffix
 
         self.filepath = path
-        self.shgfiles = sorted(glob.glob(self.filepath + '\*.' + self.shg_suffix + '.dat'))
-        self.irfiles = sorted(glob.glob(self.filepath + '\*.' + self.ir_suffix + '.dat'))
+        self.shgfiles = sorted(glob.glob(self.filepath + '\*' + self.shg_suffix + '.dat'))
+        self.irfiles = sorted(glob.glob(self.filepath + '\*' + self.ir_suffix + '.dat'))
+        # print(self.irfiles)
+        # pdb.set_trace()
         self.shg_wavelengths = {}
         self.shg_responses = {}
         self.ir_wavelengths = {}
         self.ir_responses = {}
         self.figure_index=0
-        self.get_shgdata()
-        self.get_irdata()
+        try:
+            self.get_shgdata()
+            self.get_irdata()
+        except:
+            print(len(self.shg_wavelengths))
         self.irpeaks = {}
         self.irpeaksinfo = {}
         self.shgpeaks = {}
@@ -47,7 +53,7 @@ class file_obj:
         #print(self.ir_wavelengths[0][1:10])
         #self.plot_ir_multi(yautoscale=True,ylogscale=True,xrange=[1532.24,1532.2575])
 
-    def get_shgdata(self):
+    def get_shgdata(self,resmooth=False):
 
         filename = self.shgfiles
 
@@ -64,8 +70,10 @@ class file_obj:
 
             self.shg_wavelengths[i] = np.asarray(list(map(float, wl_list)))
             self.shg_responses[i] = np.asarray(list(map(float,response_list)))
+            if resmooth:
+                self.ir_wavelengths[i] = np.linspace(self.shg_wavelengths[i][0],self.shg_wavelengths[i][-1],len(self.shg_wavelengths[i]))
 
-    def get_irdata(self):
+    def get_irdata(self,resmooth=False):
 
         filename = self.irfiles
 
@@ -82,6 +90,9 @@ class file_obj:
 
             self.ir_wavelengths[i] = np.asarray(list(map(float, wl_list)))
             self.ir_responses[i] = np.asarray(list(map(float,response_list)))
+            if resmooth:
+                self.ir_wavelengths[i] = np.linspace(self.ir_wavelengths[i][0],self.ir_wavelengths[i][-1],len(self.ir_wavelengths[i]))
+
 
     # This is called when the user wants multiple figures as opposed to having all graphs displayed on one figure
     def plot_ir_multi(self, yautoscale=False, ylogscale=False, xrange=None, yrange=None,
@@ -138,6 +149,7 @@ class file_obj:
                 my_path = self.filepath
                 plt.savefig(my_path + '/multiplotIR_' + str(j) + '.png', bbox_inches="tight")
                 j += 1
+                plt.close()
             self.figure_index += 1
 
     def plot_shg_multi(self, yautoscale=False, ylogscale=False, xrange=None, yrange=None,
@@ -194,7 +206,9 @@ class file_obj:
                 my_path = self.filepath
                 plt.savefig(my_path + '/multiplotSHG_' + str(j) + '.png', bbox_inches="tight")
                 j += 1
+                plt.close()
             self.figure_index += 1
+
 
     def plot_shg_single(self, yautoscale=False, ylogscale=False, xrange=None, yrange=None, color=None, pattern=None,
                         sx=None, sy=None, linewidth=None, save=False):
@@ -235,6 +249,8 @@ class file_obj:
                 if xrange == None:
                     raise Exception("no xrange set")
                 delta = self.shg_wavelengths[i][1] - self.shg_wavelengths[i][0]
+                if delta == 0:
+                    delta = (self.shg_wavelengths[i][-1] - self.shg_wavelengths[i][0]) / len(self.shg_wavelengths[i])
                 index_min = int((xrange[0] - self.shg_wavelengths[i][0]) // delta)
                 index_max = int((xrange[1] - self.shg_wavelengths[i][0]) // delta)
                 y_min = np.amin(self.shg_responses[i][index_min:index_max])
@@ -254,6 +270,7 @@ class file_obj:
             my_path = self.filepath
             fig.savefig(my_path+'/singleplotSHG_'+str(j)+'.png', bbox_inches="tight")
             j += 1
+            plt.close()
 
     def plot_ir_single(self, yautoscale=False, ylogscale=False, xrange=None, yrange=None, color=None, pattern=None,
                        sx=None, sy=None, linewidth=None, save=False):
@@ -315,6 +332,7 @@ class file_obj:
             my_path = self.filepath
             fig.savefig(my_path+'\\singleplotIR_'+str(j)+'.png', bbox_inches="tight")
             j += 1
+            plt.close()
 
     def plot_ir_shg_multi(self, ir_yautoscale=False, shg_yautoscale=False, ir_ylogscale=False, shg_ylogscale=False,
                           xrange=None, ir_yrange=None, shg_yrange=None, ircolor=None, shgcolor=None, irpattern=None,
@@ -413,27 +431,60 @@ class file_obj:
                 my_path = self.filepath
                 fig.savefig(my_path+'/ir_shg_'+str(j)+'.png', bbox_inches="tight")
                 j += 1
+                plt.close()
 
     def get_irpeaks(self,max_width=0.03, min_dist=0.05, prominence=0.1):
 
         for i in range(len(self.irfiles)):
             delta = abs(self.ir_wavelengths[i][1]-self.ir_wavelengths[i][0])
+            if delta == 0:
+                delta = (self.ir_wavelengths[i][-1]-self.ir_wavelengths[i][0]) / len(self.ir_wavelengths[i])
             actual_distance = min_dist//delta
             actual_width = max_width//delta
+            total_length = len(self.ir_wavelengths[i])
+            tenths = total_length//10
+            index = 0
+            self.irpeaks[i] = []
+            self.irpeaksinfo[i] = {}
+            # split entire data array into ten groups so that the local peaks correspond to more global maximums
+            # for j in range(10):
+            #     maxpoint = np.amax(self.ir_responses[i][index:index+tenths])
+            #     test_array = (maxpoint * 1.1 - self.ir_responses[i][index:index + tenths])
+            #     index += tenths
+
+                # temp_peaks, temp_peaksinfo = find_peaks(test_array, distance=actual_distance,height=0,
+                #                                               prominence=prominence, width=(None, actual_width))
+                # self.irpeaks[i] = np.append(self.irpeaks[i],temp_peaks+index)
+                # # self.irpeaks[i].append(temp_peaks+index)
+                # for key in temp_peaksinfo:
+                #     # pdb.set_trace()
+                #     if key in self.irpeaksinfo:
+                #         self.irpeaksinfo[i][key] = np.append(self.irpeaksinfo[i][key], temp_peaksinfo[key])
+                #     else:
+                #         self.irpeaksinfo[i][key] = []
+                #         self.irpeaksinfo[i][key] = np.append(self.irpeaksinfo[i][key],temp_peaksinfo[key])
+                # # self.irpeaksinfo[i].append(temp_peaksinfo)
+                # # pdb.set_trace()
+                # self.irpeaks[i] = self.irpeaks[i].astype(int)
+
             maxpoint = np.amax(self.ir_responses[i])  # np.amax(np.log10(self.ir_responses[i]))
-            test_array = (maxpoint * 1.1 - (self.ir_responses[i]))
+            test_array = (maxpoint * 1.1 - np.log10(self.ir_responses[i]))
             self.irpeaks[i], self.irpeaksinfo[i] = find_peaks(test_array, distance=actual_distance,height=0,
                                                               prominence=prominence, width=(None, actual_width))
+            # pdb.set_trace()
+            # pdb.set_trace()
 
-    def get_shgpeaks(self,max_width=0.03, min_dist=0.05, prominence=0.5, height=10):
+    def get_shgpeaks(self,max_width=0.03, min_dist=0.05, prominence=0.1, height=10):
 
-        for i in range(len(self.irfiles)):
+        for i in range(len(self.shgfiles)):
             delta = abs(self.shg_wavelengths[i][1]-self.shg_wavelengths[i][0])
             actual_distance = min_dist//delta
             actual_width = max_width//delta
             # test_array = np.log10(self.shg_responses[i])
             self.shgpeaks[i], self.shgpeaksinfo[i] = find_peaks(self.shg_responses[i], height=height, distance=actual_distance,
                                                                 prominence=prominence, width=(None, actual_width))
+            # pdb.set_trace()
+            # print((self.shgpeaks[i]))
 
     def plot_shg_peaks(self, ylogscale=False, xrange=None, yrange=None,
                        color=None, pattern=None, linewidth=None, save=False,
@@ -485,6 +536,7 @@ class file_obj:
         else:
             my_path = self.filepath
             plt.savefig(my_path + '/plotSHGpeaks_' + '.png', bbox_inches="tight", dpi=400)
+            plt.close()
         # self.figure_index += 1
 
     def plot_ir(self, index=None, yautoscale=False, ylogscale=False, xrange=None, yrange=None, color=None, pattern=None,
@@ -557,7 +609,19 @@ class file_obj:
 
         return np.asarray(d_array), np.asarray(wavelengths), np.asarray(new_d)
 
-    def Qfit(self, fsr_range=None, ng=2.365, radius=50, n_mode=4, wavelength=1550, save=False):
+    def Qfit(self, fsr_range=None, ng=2.365, radius=50, n_mode=4, wavelength=1550,
+             save=False, prominence=0.1, max_width=0.03, min_dist=0.05, xrange=None):
+
+        if not xrange==None:
+            for i in self.ir_responses:
+                new_wavelengths = []
+                new_responses = []
+                begin = np.where(self.ir_wavelengths[i]==xrange[0])
+                end = np.where(self.ir_wavelengths[i]==xrange[1])
+                new_wavelengths.append(self.ir_wavelengths[i][begin[0][0]:end[0][0]])
+                new_responses.append(self.ir_responses[i][begin[0][0]:end[0][0]])
+                self.ir_wavelengths[i] = new_wavelengths[0]
+                self.ir_responses[i] = new_responses[0]
 
         def fsr_slope_estimate(ng,radius,wavelength):
             wl_max = wavelength/1000+0.07
@@ -582,7 +646,7 @@ class file_obj:
             sr = fsr_slope_estimate(ng=ng, radius=radius, wavelength=wavelength)
             slope_range = [sr - 0.001, sr + 0.001]
 
-        self.get_irpeaks()
+        self.get_irpeaks(max_width=max_width, prominence=prominence,min_dist=min_dist)
 
         def lorentz(x, I, x0, w, off):  # amp, cent, width, offset. Note that 2*w is FWHM
             return -I * ((np.power(w, 2)) / (np.power((x - x0), 2) + np.power(w, 2))) + off
@@ -602,6 +666,7 @@ class file_obj:
             fit_bw = 3*peak_lw
 
             fig, ax = self.plot_ir(i,ylogscale=True)
+            # pdb.set_trace()
             ax[0].plot(self.ir_wavelengths[i][self.irpeaks[i]], self.ir_responses[i][self.irpeaks[i]], "x")
             axdb = ax[1].twinx()
 
@@ -682,6 +747,8 @@ class file_obj:
             else:
                 my_path = self.filepath
                 fig.savefig(self.irfiles[i] + '.png', bbox_inches="tight", dpi=400)
+                # fig.clf()
+                plt.close()
 
     def mode_analyze(self, diff_array, wl_array, n, slope_range=[0.0032,0.0054]):
         # this code filters out the noisy nearest neighbour distances by estimated slope
